@@ -9,8 +9,55 @@ metadata:
 spec:
   steps:
     # First implement something that makes sure that only valid teams pass, that means to exclude invalid and cheaters
+    - filter:
+        expression: |-
+          ! (string(msg) contains "Invalid Teamname" || string(msg) contains "Cheaters")
+      name: input
+      sources:
+        - kafka:
+            name: kickerscore
+            groupId: kicker_reader_input
+            topic: kicker_results
+      sinks:
+        - kafka:
+            name: kickerscore
+            topic: kicker_filter_teams
+          name: kafka
+#        - log: {}
+#          name: logger
     # Then implement a mapping to only extract the winner data from the json messages
-
+    - map:
+        expression: |-
+          json(object(msg)["winner"])
+      name: winners
+      sources:
+        - kafka:
+            name: kickerscore
+            groupId: kicker_reader_filtered_0
+            topic: kicker_filter_teams
+      sinks:
+        - kafka:
+            name: kickerscore
+            topic: kicker_winners
+          name: kafka
+#        - log: {}
+#          name: logger
+    - map:
+        expression: |-
+          json(object(msg)["loser"])
+      name: losers
+      sources:
+        - kafka:
+            name: kickerscore
+            groupId: kicker_reader_filtered_1
+            topic: kicker_filter_teams
+      sinks:
+        - kafka:
+            name: kickerscore
+            topic: kicker_losers
+          name: kafka
+#        - log: {}
+#          name: logger
     # Using that information, you can use the code below that should work if you did not do anything strange above.
     # Just have some fun changing random things.
     - group:
