@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer-deployment
+  labels:
+    app: producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+    spec:
+      containers:
+        - name: producer
+          image: continuumio/miniconda3
+          command:
+            - /bin/sh
+            - -c
+            - pip install --user kafka-python && python /tmp/producer.py
+          volumeMounts:
+            - name: producer-script
+              mountPath: /tmp
+      volumes:
+        - name: producer-script
+          configMap:
+            name: producer-script
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: producer-script
+data:
+  producer.py: |
+    import json
+    import random
+    import time
+    import logging
+
+    from kafka import KafkaProducer
+
+
+    def on_send_success(record_metadata):
+        print(record_metadata)
+
+
+    def on_send_error(excp):
+        logging.error(f'Producer not sending results: {excp}')
+        # handle exception
+
+
+    def produce():
+        teams = ['Deadly Stingers', 'Shark Panthers', 'Diamond Cutters', 'Nunchuk Racers', 'Alpha Flyers', 'Risky Business',
+                 'Cheaters', 'Invalid Teamname']
+        producer = KafkaProducer(bootstrap_servers='kafka-0.kafka-headless.argo-kafka.svc.cluster.local:9092',
+                                 value_serializer=lambda m: json.dumps(m).encode('utf-8'))
+        timer = 0
+        limit = 300
+        while True:
+            if timer >= limit:
+                for team in teams:
+                    # Added to notify that individual teams should be processed
+                    producer.send('kicker_timer', {'team': team, 'limit': True})
+                timer = 0
+                # Added to notify that all teams should be processed
+                producer.send('kicker_timer', {'team': 'ALL', 'limit': True})
+            else:
+                chosen_teams = random.sample(teams, 2)
+                payload = {}
+                if random.random() > 0.5:
+                    winning_team = 0
+                    losing_team = 1
+                else:
+                    winning_team = 1
+                    losing_team = 0
+    
+                if random.random() > 0.9:
+                    payload['winner'] = {'team': chosen_teams[winning_team], 'score': random.randint(0, 9)}
+                else:
+                    payload['winner'] = {'team': chosen_teams[winning_team], 'score': 10}
+                payload['loser'] = {'team': chosen_teams[losing_team], 'score': random.randint(0, 9)}
+                producer.send('kicker_results', payload)
+                print(f"sent payload {payload} to topic kicker_results")
+                timer = timer + 5
+                time.sleep(5)
+
+    if __name__ == "__main__":
+        produce()

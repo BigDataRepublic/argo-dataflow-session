@@ -1,0 +1,44 @@
+apiVersion: dataflow.argoproj.io/v1alpha1
+kind: Pipeline
+metadata:
+  annotations:
+    dataflow.argoproj.io/description: This is an example of built-in flattening and
+      expanding.
+    dataflow.argoproj.io/owner: argoproj-labs
+  name: 102-flatten-expand
+spec:
+  steps:
+    - map:
+        expression: |-
+          bytes('{"foo": {"bar": "' + string(msg) + '"}}')
+      name: generate
+      sinks:
+        - kafka:
+            name: kickerscore
+            topic: demo_source
+      sources:
+        - cron:
+            schedule: '*/3 * * * * *'
+    - flatten: {}
+      name: flatten
+      sinks:
+        - kafka:
+            name: kickerscore
+            topic: demo_flatten
+          name: kafka
+        - log: {}
+          name: logger
+      sources:
+        - kafka:
+            name: kickerscore
+            topic: demo_source
+            groupId: demo_flatten
+    - expand: {}
+      name: expand
+      sinks:
+        - log: {}
+      sources:
+        - kafka:
+            name: kickerscore
+            topic: demo_flatten
+            groupId: demo_expand
