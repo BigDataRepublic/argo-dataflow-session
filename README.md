@@ -70,11 +70,67 @@ kubectl apply -f argo_yamls/kickerscore_kafka_input.yaml
 
 It will generate match outputs every 5 seconds. And every 5 minutes it will trigger the end of a "Tournament".
 
-Using this information, take a look at the input data using the kafka tools available mentioned above, and implement the missing blocks and apply:
+Using this information, take a look at the input data using the kafka tools available mentioned above.
+
+Execute the steps below, 
 ```bash
 kubectl apply -f argo_yamls/kickerscore_pipeline.yaml
 ```
 
-We already implemented some extra stuff. Feel free to change and do random thing ;). The log sinks can be added to have a better grasp of what the processors are doing.
+#### Step 1:
+Implement something that makes sure that only valid teams pass, that means to exclude invalid and cheaters
 
+Events to expect on `kicker_results` topic are:
+```json lines
+{ "winner": { "team": "Invalid Teamname", "score": 10 }, "loser": { "team": "Diamond Cutters", "score": 1 } }
+{ "winner": { "team": "Diamond Cutters", "score": 0 }, "loser": { "team": "Nunchuk Racers", "score": 2 } }
+{ "winner": { "team": "Shark Panthers", "score": 10 }, "loser": { "team": "Invalid Teamname", "score": 8 } }
+{ "winner": { "team": "Nunchuk Racers", "score": 10 }, "loser": { "team": "Invalid Teamname", "score": 1 } }
+{ "winner": { "team": "Deadly Stingers", "score": 10 }, "loser": { "team": "Nunchuk Racers", "score": 2 } }
+{ "winner": { "team": "Shark Panthers", "score": 10 }, "loser": { "team": "Alpha Flyers", "score": 2 } }
+{ "winner": { "team": "Risky Business", "score": 10 }, "loser": { "team": "Nunchuk Racers", "score": 2 } }
+{ "winner": { "team": "Cheaters", "score": 4 }, "loser": { "team": "Invalid Teamname", "score": 1 } }
+{ "winner": { "team": "Nunchuk Racers", "score": 0 }, "loser": { "team": "Shark Panthers", "score": 8 } }
+{ "winner": { "team": "Deadly Stingers", "score": 10 }, "loser": { "team": "Alpha Flyers", "score": 1 } }
+```
+So what we expect is: drop events that where the following teams are involved: Invalid Teamname & Cheaters:
+```json lines
+{ "winner": { "team": "Diamond Cutters", "score": 0 }, "loser": { "team": "Nunchuk Racers", "score": 2 } }
+{ "winner": { "team": "Deadly Stingers", "score": 10 }, "loser": { "team": "Nunchuk Racers", "score": 2 } }
+{ "winner": { "team": "Shark Panthers", "score": 10 }, "loser": { "team": "Alpha Flyers", "score": 2 } }
+{ "winner": { "team": "Risky Business", "score": 10 }, "loser": { "team": "Nunchuk Racers", "score": 2 } }
+{ "winner": { "team": "Nunchuk Racers", "score": 0 }, "loser": { "team": "Shark Panthers", "score": 8 } }
+{ "winner": { "team": "Deadly Stingers", "score": 10 }, "loser": { "team": "Alpha Flyers", "score": 1 } }
+```
+Write these out to another kafka topic, lets say `kicker_filter_teams`.
+
+#### Step 2:
+Implement a mapping to only extract the winner data from the json messages
+
+So the output should be on topic `kicker_winners`:
+```json lines
+{ "team": "Diamond Cutters", "score": 0 }
+{ "team": "Deadly Stingers", "score": 10 }
+{ "team": "Shark Panthers", "score": 10 }
+{ "team": "Risky Business", "score": 10 }
+{ "team": "Nunchuk Racers", "score": 0 } // <- weird right, lets not care about it for now
+{ "team": "Deadly Stingers", "score": 10 }
+```
+
+#### Step 3:
+Using that information, you can create additional steps to creates input like the following:
+```json lines
+{ "champion": "Shark Panthers", "at": "2022-03-23 21:28:13.828344", "wins": 8 }
+{ "champion": "Diamond Cutters", "at": "2022-03-23 21:33:14.562645", "wins": 10 }
+{ "champion": "Deadly Stingers", "at": "2022-03-23 22:04:53.251637", "wins": 0 }
+{ "champion": "Diamond Cutters", "at": "2022-03-23 22:08:42.209762", "wins": 3 }
+{ "champion": "Shark Panthers", "at": "2022-03-23 22:13:42.144747", "wins": 6 }
+{ "champion": "Alpha Flyers", "at": "2022-03-23 22:18:42.633291", "wins": 4 }
+{ "champion": "Diamond Cutters", "at": "2022-03-23 22:23:43.467081", "wins": 14 }
+```
+To get the above, you need to use the championship triggers on the `kicker_timer` topic .
+
+Just have some fun changing random things. See the `feature/solutions` for the complete pipeline.
+
+### For more information
 Take a look at the [docs](https://github.com/argoproj-labs/argo-dataflow/tree/main/docs), and [examples](https://github.com/argoproj-labs/argo-dataflow/tree/main/examples).
