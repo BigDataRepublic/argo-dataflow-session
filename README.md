@@ -132,7 +132,7 @@ Using that information, you can create additional steps to process the events to
 ```
 To get the above, you can use the championship triggers on the `kicker_timer` topic.
 
-Just have some fun changing random things. See the `feature/solutions` for the complete pipeline.
+Just have some fun changing random things. See the `feat/solutions` for the complete pipeline.
 
 ### For more information
 Take a look at the [docs](https://github.com/argoproj-labs/argo-dataflow/tree/main/docs), and [examples](https://github.com/argoproj-labs/argo-dataflow/tree/main/examples).
