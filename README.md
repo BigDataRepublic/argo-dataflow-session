@@ -7,7 +7,6 @@ This repository contains the example code to use for the hands on.
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
 kubectl create ns argo-kafka
-kubectl apply -f argo_yamls/kafka_secret.yaml
 helm install kafka bitnami/kafka --namespace=argo-kafka
 ```
 
@@ -35,6 +34,11 @@ Change to the installation namespace:
 
 ```bash
 kubectl config set-context --current --namespace=argo-dataflow-system
+```
+
+Store the kakfa cluster information secret
+```bash
+kubectl apply -f argo_yamls/kafka_secret.yaml
 ```
 
 If you want the user interface:
