@@ -72,13 +72,14 @@ It will generate match outputs every 5 seconds. And every 5 minutes it will trig
 
 Using this information, take a look at the input data using the kafka tools available mentioned above.
 
-Execute the steps below, 
+Now try to implement the steps below, either using the [python dsl](https://pypi.org/project/argo-dataflow/), 
+or simply add to the `kickerscore_pipeline.yaml` and apply it with:
 ```bash
 kubectl apply -f argo_yamls/kickerscore_pipeline.yaml
 ```
 
 #### Step 1:
-Implement something that makes sure that only valid teams pass, that means to exclude invalid and cheaters
+Implement something that makes sure that only valid teams pass, that means to exclude invalid teams and cheaters.
 
 Events to expect on `kicker_results` topic are:
 ```json lines
@@ -93,7 +94,8 @@ Events to expect on `kicker_results` topic are:
 { "winner": { "team": "Nunchuk Racers", "score": 0 }, "loser": { "team": "Shark Panthers", "score": 8 } }
 { "winner": { "team": "Deadly Stingers", "score": 10 }, "loser": { "team": "Alpha Flyers", "score": 1 } }
 ```
-So what we expect is: drop events that where the following teams are involved: Invalid Teamname & Cheaters:
+Filter out events where the following teams are involved: Invalid Teamname & Cheaters and write them to topic `kicker_filter_teams`.
+The events on this topic should look like this:
 ```json lines
 { "winner": { "team": "Diamond Cutters", "score": 0 }, "loser": { "team": "Nunchuk Racers", "score": 2 } }
 { "winner": { "team": "Deadly Stingers", "score": 10 }, "loser": { "team": "Nunchuk Racers", "score": 2 } }
@@ -102,23 +104,23 @@ So what we expect is: drop events that where the following teams are involved: I
 { "winner": { "team": "Nunchuk Racers", "score": 0 }, "loser": { "team": "Shark Panthers", "score": 8 } }
 { "winner": { "team": "Deadly Stingers", "score": 10 }, "loser": { "team": "Alpha Flyers", "score": 1 } }
 ```
-Write these out to another kafka topic, lets say `kicker_filter_teams`.
+Optionally you can also try to filter out invalid winners that do not have a score of 10.
 
 #### Step 2:
 Implement a mapping to only extract the winner data from the json messages
 
-So the output should be on topic `kicker_winners`:
+So the output event written on topic `kicker_winners`:
 ```json lines
-{ "team": "Diamond Cutters", "score": 0 }
+{ "team": "Diamond Cutters", "score": 0 } // <- these are some weird winners
 { "team": "Deadly Stingers", "score": 10 }
 { "team": "Shark Panthers", "score": 10 }
 { "team": "Risky Business", "score": 10 }
-{ "team": "Nunchuk Racers", "score": 0 } // <- weird right, lets not care about it for now
+{ "team": "Nunchuk Racers", "score": 0 } // <- these are some weird winners
 { "team": "Deadly Stingers", "score": 10 }
 ```
 
 #### Step 3:
-Using that information, you can create additional steps to creates input like the following:
+Using that information, you can create additional steps to process the events to something like the following:
 ```json lines
 { "champion": "Shark Panthers", "at": "2022-03-23 21:28:13.828344", "wins": 8 }
 { "champion": "Diamond Cutters", "at": "2022-03-23 21:33:14.562645", "wins": 10 }
@@ -128,7 +130,7 @@ Using that information, you can create additional steps to creates input like th
 { "champion": "Alpha Flyers", "at": "2022-03-23 22:18:42.633291", "wins": 4 }
 { "champion": "Diamond Cutters", "at": "2022-03-23 22:23:43.467081", "wins": 14 }
 ```
-To get the above, you need to use the championship triggers on the `kicker_timer` topic .
+To get the above, you can use the championship triggers on the `kicker_timer` topic.
 
 Just have some fun changing random things. See the `feature/solutions` for the complete pipeline.
 
